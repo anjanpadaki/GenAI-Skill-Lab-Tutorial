@@ -145,8 +145,15 @@ pip install tensorflow torch transformers gensim scikit-learn matplotlib pandas 
 
 ---
 
-## 👤 Author
+## 👥 Authors
 
-**Anjan Padaki**  
-Department of Computer Science & Engineering / AI  
-Ramaiah Institute of Technology (MSRIT), Bangalore
+| Name | USN |
+| :--- | :--- |
+| **Aditya Karan** | `1MS23CS012` |
+| **Shivansh** | `1MS23CS016` |
+| **Amay Ranjan** | `1MS23CS019` |
+| **Anjan Padaki** | `1MS23CS024` |
+
+*Department of Computer Science & Engineering*  
+*Ramaiah Institute of Technology (MSRIT), Bangalore*
+
