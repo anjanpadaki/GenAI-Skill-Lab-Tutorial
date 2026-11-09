@@ -16,6 +16,7 @@ import sys
 import numpy as np
 import gensim.downloader as api
 from sklearn.decomposition import PCA
+from sklearn.cluster import KMeans
 import matplotlib.pyplot as plt
 
 # Ensure matplotlib runs smoothly in all environments
@@ -71,33 +72,63 @@ arithmetic_tests = [
     },
     {
         "description": "3. Comparative Adjective Analogy",
-        "formula": "biggest - big + small = ?",
-        "positive": ["biggest", "small"],
-        "negative": ["big"],
-        "expected": "smallest",
-        "insight": "Captures the superlative degree offset applied to different base adjectives."
+        "formula": "better - good + bad = ?",
+        "positive": ["better", "bad"],
+        "negative": ["good"],
+        "expected": ["worse"],
+        "insight": "Captures the comparative-degree offset (good -> better) applied to 'bad'."
     },
     {
         "description": "4. Technology & Domain Analogy",
         "formula": "software - computer + biology = ?",
         "positive": ["software", "biology"],
         "negative": ["computer"],
-        "expected": "biotechnology / genetics / biological",
+        "expected": ["biotechnology", "genetics", "bioinformatics"],
         "insight": "Transfers the concept of programmatic engineering into the life sciences domain."
+    },
+    {
+        "description": "5. Superlative Adjective Analogy (Limitation Case)",
+        "formula": "biggest - big + small = ?",
+        "positive": ["biggest", "small"],
+        "negative": ["big"],
+        "expected": ["smallest"],
+        "insight": "Tests whether the superlative offset (big -> biggest) transfers to 'small'."
     }
 ]
 
+analogy_summary = []
 for test in arithmetic_tests:
     print(f"\n--- {test['description']} ---")
     print(f"Formula : {test['formula']}")
-    
+
     results = model.most_similar(positive=test["positive"], negative=test["negative"], topn=4)
+    top_words = [w.lower() for w, _ in results]
     print(f"Top Candidate Words from Vector Arithmetic:")
     for rank, (word, score) in enumerate(results, 1):
-        indicator = " (Matches Expected!)" if word.lower() == test["expected"].lower() else ""
+        indicator = " (Matches Expected!)" if word.lower() in test["expected"] else ""
         print(f"   {rank}. {word:<15} [Cosine Similarity: {score:.4f}]{indicator}")
-    
+
+    print(f"Expected : {' / '.join(test['expected'])}")
     print(f"Semantic Analysis: {test['insight']}")
+    if top_words[0] in test["expected"]:
+        verdict = "SUCCESS - the expected word is the top result."
+    elif any(w in test["expected"] for w in top_words):
+        verdict = "PARTIAL - the expected word appears in the top 4, but not at rank 1."
+    else:
+        verdict = (f"FAILED - the expected word is not in the top 4; the top result is "
+                   f"'{results[0][0]}'. The relationship is not encoded as a consistent "
+                   f"direction for these words in GloVe-50.")
+        nearby = [w for w in top_words if w.startswith(test["positive"][0][:3])]
+        if nearby:
+            verdict += (f" The result stays close to the input word "
+                        f"'{test['positive'][0]}' ({', '.join(nearby)}), showing that "
+                        f"its own meaning dominates the arithmetic.")
+    print(f"Result   : {verdict}")
+    analogy_summary.append((test["formula"], verdict.split(" ")[0]))
+
+print("\nAnalogy Summary:")
+for formula, status in analogy_summary:
+    print(f"  {formula:<36} {status}")
 
 
 # ==============================================================================
@@ -141,19 +172,33 @@ print("-" * 50)
 for i, word in enumerate(domain_words):
     print(f"{word:<15} | {reduced_vectors[i, 0]:>14.4f} | {reduced_vectors[i, 1]:>14.4f}")
 
-# Pairwise Cosine Similarity Matrix between the 10 Domain Words
-print("\nPairwise Cosine Similarity Sample:")
-print(f"  - 'computer' <-> 'laptop'   : {model.similarity('computer', 'laptop'):.4f} (High hardware similarity)")
-print(f"  - 'software' <-> 'algorithm': {model.similarity('software', 'algorithm'):.4f} (High logic/program similarity)")
-print(f"  - 'internet' <-> 'website'  : {model.similarity('internet', 'website'):.4f} (High web connectivity similarity)")
-print(f"  - 'server'   <-> 'network'  : {model.similarity('server', 'network'):.4f} (High infrastructure similarity)")
+def similarity_label(score):
+    if score >= 0.65:
+        return "High"
+    if score >= 0.45:
+        return "Moderate"
+    return "Low"
 
-# Generate Matplotlib Visualization
+
+# Pairwise Cosine Similarity between selected pairs (computed in the full 50D space)
+print("\nPairwise Cosine Similarity Sample (50D space):")
+for a, b in [("computer", "laptop"), ("software", "algorithm"),
+             ("internet", "website"), ("server", "network")]:
+    s = model.similarity(a, b)
+    print(f"  - {a!r:<11}<-> {b!r:<12}: {s:.4f} ({similarity_label(s)} similarity)")
+
+# Cluster the 2D PCA points so the analysis matches what the plot shows
+N_CLUSTERS = 3
+kmeans = KMeans(n_clusters=N_CLUSTERS, n_init=10, random_state=42)
+cluster_ids = kmeans.fit_predict(reduced_vectors)
+cluster_colors = ["tab:blue", "tab:orange", "tab:green", "tab:red", "tab:purple"]
+
+# Generate Matplotlib Visualization (points coloured by cluster)
 plt.figure(figsize=(10, 7))
 plt.scatter(
     reduced_vectors[:, 0],
     reduced_vectors[:, 1],
-    color="#1f77b4",
+    c=[cluster_colors[c] for c in cluster_ids],
     s=120,
     edgecolors="black",
     linewidths=1.5,
@@ -184,19 +229,44 @@ plot_path = os.path.join(os.path.dirname(__file__), plot_filename)
 plt.savefig(plot_path, dpi=300)
 print(f"\n[Visualization Saved]: '{plot_filename}' saved successfully.")
 
-# Analysis of Clusters and Relationships
+# Analysis of Clusters and Relationships (computed from the data, not hard-coded)
 print("\n" + "-" * 80)
 print("ANALYSIS OF CLUSTERS & RELATIONSHIPS IN THE EMBEDDING SPACE:")
 print("-" * 80)
-print("1. Physical Client Devices Cluster:")
-print("   - 'computer', 'laptop', and 'hardware' map closely together.")
-print("   - Cosine distance is minimal because both words share physical and user-device usage contexts.")
-print("\n2. Web & Infrastructure Cluster:")
-print("   - 'internet', 'network', 'website', and 'server' form a cohesive group.")
-print("   - They represent modern distributed communications and hosting paradigms.")
-print("\n3. Computational Logic & Systems Cluster:")
-print("   - 'software', 'algorithm', and 'database' cluster as software-engineering primitives.")
-print("   - Demonstrates that GloVe vectors capture nuanced functional distinctions even within one domain.")
+
+sim_matrix = np.array([[model.similarity(a, b) for b in domain_words] for a in domain_words])
+
+print(f"1. K-Means Clusters on the 2D PCA Projection (k = {N_CLUSTERS}):")
+for c in range(N_CLUSTERS):
+    members = [w for w, cid in zip(domain_words, cluster_ids) if cid == c]
+    idx = [domain_words.index(w) for w in members]
+    if len(idx) > 1:
+        pair_sims = [sim_matrix[i, j] for i in idx for j in idx if i < j]
+        cohesion = f"average 50D similarity within cluster = {np.mean(pair_sims):.4f}"
+    else:
+        cohesion = "single-word cluster (isolated in the plot)"
+    print(f"   - Cluster {c + 1} ({cluster_colors[c].replace('tab:', '')} in plot): {', '.join(members)}")
+    print(f"       {cohesion}")
+
+print("\n2. Nearest Neighbour of Each Word (within the 10 words, 50D cosine similarity):")
+for i, w in enumerate(domain_words):
+    sims = sim_matrix[i].copy()
+    sims[i] = -1
+    j = int(np.argmax(sims))
+    print(f"   - {w:<10} -> {domain_words[j]:<10} ({sims[j]:.4f}, {similarity_label(sims[j])})")
+
+print("\n3. Outlier Word (lowest average similarity to the other 9 words):")
+avg_sims = (sim_matrix.sum(axis=1) - 1.0) / (len(domain_words) - 1)
+outlier = int(np.argmin(avg_sims))
+central = int(np.argmax(avg_sims))
+print(f"   - Outlier : '{domain_words[outlier]}' (average similarity {avg_sims[outlier]:.4f})")
+print(f"   - Most central word : '{domain_words[central]}' (average similarity {avg_sims[central]:.4f})")
+print("   - The outlier tends to appear in different contexts (e.g. mathematics or research")
+print("     text) than the everyday technology words, so GloVe places it further away.")
+
+print(f"\n4. Note: the 2D plot keeps only {sum(var_ratio)*100:.1f}% of the variance, so some words")
+print("   that look close in 2D may be less similar in the full 50D space (compare the")
+print("   cluster memberships above with the 50D nearest neighbours).")
 
 
 # ==============================================================================
