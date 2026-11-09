@@ -53,11 +53,12 @@ def summarize_text(model, tokenizer, text, max_len=100, min_len=25):
     """
     Generates an abstractive summary of an academic text using Seq2Seq beam search.
     """
-    input_text = "summarize: " + text.strip()
+    # BART-CNN models are trained only for summarization, so no task prefix is needed
+    input_text = " ".join(text.split())
     inputs = tokenizer(
         input_text,
         return_tensors="pt",
-        max_length=512,
+        max_length=1024,
         truncation=True
     )
     
@@ -67,11 +68,12 @@ def summarize_text(model, tokenizer, text, max_len=100, min_len=25):
         min_length=min_len,
         num_beams=4,
         length_penalty=1.5,
-        no_repeat_ngram_size=2,
+        no_repeat_ngram_size=3,
         early_stopping=True
     )
     
     summary = tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+    summary = summary.strip().replace(" .", ".").replace(" ,", ",")
     return summary
 
 
@@ -84,8 +86,9 @@ def main():
     print("  substantially reducing reading overhead while preserving key findings.\n")
 
     # Step 1: Model Selection & Loading
-    model_name = "google/flan-t5-small"
-    print(f"[Step 1] Loading Pre-trained Hugging Face Model: '{model_name}'...")
+    # BART-Large fine-tuned on the CNN/DailyMail news summarization dataset
+    model_name = "facebook/bart-large-cnn"
+    print(f"[Step 1] Loading Pre-trained Hugging Face Summarization Model: '{model_name}'...")
     
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
@@ -122,11 +125,20 @@ def main():
     print_banner("GENERATING CONCISE EXECUTIVE SUMMARY")
     print("Generating abstractive summary using beam search generation (num_beams=4)...")
     
-    summary = summarize_text(model, tokenizer, academic_report, max_len=80, min_len=20)
-    
+    summary = summarize_text(model, tokenizer, academic_report, max_len=90, min_len=30)
+
     summary_words = len(summary.split())
     summary_chars = len(summary)
     compression_ratio = (1.0 - (summary_words / original_words)) * 100.0
+
+    # Check which key facts from the report survive in the summary
+    key_facts = ["1,250", "34.6%", "15 minutes", "22%", "hallucination"]
+    covered = [f for f in key_facts if f in summary]
+
+    # Check whether the summary is copied verbatim (extractive) or rewritten (abstractive)
+    flat_report = " ".join(academic_report.split()).lower()
+    summary_sentences = [s.strip().lower() for s in summary.split(".") if s.strip()]
+    copied = sum(1 for s in summary_sentences if s in flat_report)
 
     print("\n" + "=" * 80)
     print("  FINAL CONCISE SUMMARY (EXECUTIVE REVIEW)")
@@ -139,7 +151,9 @@ def main():
     print(f"  - Summary Length        : {summary_words} words ({summary_chars} characters)")
     print(f"  - Word Reduction        : {original_words - summary_words} words eliminated")
     print(f"  - Compression Ratio     : {compression_ratio:.2f}% reduction")
-    print(f"  - Semantic Completeness : Captured key methodologies, metrics (+34.6% efficiency), and conclusions.")
+    print(f"  - Key Facts Retained    : {len(covered)}/{len(key_facts)} "
+          f"({', '.join(covered) if covered else 'none'})")
+    print(f"  - Verbatim Sentences    : {copied}/{len(summary_sentences)} copied word-for-word from the report")
     print("=" * 80)
     print("  SUMMARIZATION PROCESS COMPLETED SUCCESSFULLY")
     print("=" * 80)

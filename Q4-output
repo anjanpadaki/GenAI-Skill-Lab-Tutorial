@@ -7,7 +7,7 @@ Application Context:
   Face Transformer to produce fast, high-fidelity executive summaries,
   substantially reducing reading overhead while preserving key findings.
 
-[Step 1] Loading Pre-trained Hugging Face Model: 'google/flan-t5-small'...
+[Step 1] Loading Pre-trained Hugging Face Summarization Model: 'facebook/bart-large-cnn'...
          Model and Tokenizer loaded successfully!
 
 ================================================================================
@@ -39,16 +39,17 @@ Generating abstractive summary using beam search generation (num_beams=4)...
   FINAL CONCISE SUMMARY (EXECUTIVE REVIEW)
 ================================================================================
 
-"In this study, the Computer Science and Artificial Intelligence Department evaluated transformer models deployed on academic text processing tasks, focusing on automated literature review generation, knowledge graph construction and multi-document synthesis."
+"Transformer-based deep neural networks have revolutionized Natural Language Processing (NLP) across various biomedical and educational disciplines. The investigation concludes that implementing fine-tuned seq2seq transformers into university library repositories significantly accelerates scholarly discovery."
 
 --------------------------------------------------------------------------------
 SUMMARY PERFORMANCE METRICS:
 --------------------------------------------------------------------------------
   - Original Length       : 146 words (1302 characters)
-  - Summary Length        : 31 words (258 characters)
-  - Word Reduction        : 115 words eliminated
-  - Compression Ratio     : 78.77% reduction
-  - Semantic Completeness : Captured key methodologies, metrics (+34.6% efficiency), and conclusions.
+  - Summary Length        : 32 words (309 characters)
+  - Word Reduction        : 114 words eliminated
+  - Compression Ratio     : 78.08% reduction
+  - Key Facts Retained    : 0/5 (none)
+  - Verbatim Sentences    : 2/2 copied word-for-word from the report
 ================================================================================
   SUMMARIZATION PROCESS COMPLETED SUCCESSFULLY
 ================================================================================
